@@ -89,7 +89,29 @@ function defineConnection{
     $connectionString = "Server="+$db_host+";Database="+$db_name+";User ID ="+$db_user+";Password="+$db_pass+";"
     $global:connection.ConnectionString = $connectionString
 }
+#run query and store result in $Address variable
+function runQuery{
+    try{
+    $Command = New-Object System.Data.SQLClient.SQLCommand
+    $Command.Connection = $connection
+    $SQLQuery = "SELECT ELIT_FULLADDRESS FROM DOCUMENTS WHERE DOC = "+ $doc
+    $Command.CommandText = $SQLQuery
 
+    $Connection.Open()
+    $reader = $Command.ExecuteReader()
+    $reader.Read()
+    $global:Address = [System.Text.Encoding]::GetEncoding("UTF-16");
+
+    $global:Address = $reader["ELIT_FULLADDRESS"]
+    $reader.Close()
+    $Connection.Close()
+    }
+    catch{
+        $string = "Error -> "+$Error[0].Exception
+		log $string
+        exit
+    }
+}
 #this functions updates the database based on the response from WebRequest
 function databaseUpdate{
     try{
@@ -124,6 +146,12 @@ readConfigFile
 
 log 'Config file parsed. Converting arguments to JSON.'
 
+
+log 'Pull address from sql bd '
+defineConnection
+$global:doc = ''+$args[0]
+runQuery
+
 #create JSON out of args array for POST
 #$params = [PsCustomObject]@{
 $params = @{
@@ -132,13 +160,13 @@ $params = @{
     DOCNO=''+$args[2]
     BOOKNUM=''+$args[3]
     ELIT_CITYNAME=''+$args[4]
-    ELIT_FULLADDRESS=''+$args[5]
+    ELIT_FULLADDRESS=''+ $Address   #$args[5]
     ELYD_CELL=''+$args[6]
     #ELYD_CELL2=''+$args[7]
     #ELYD_CELL=''+$args[8]
     IS_ENGLISH=''+$args[9]
 }
-$global:doc = ''+$args[0]
+
 $postParams = $params #| ConvertTo-JSON
 
 log 'POST JSON created. Creating request.'
